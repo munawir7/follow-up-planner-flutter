@@ -84,6 +84,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Follow-Up Planner'), findsOneWidget);
-expect(find.text('No calls scheduled'), findsOneWidget);
+    expect(find.text('No calls scheduled'), findsOneWidget);
   });
 }

@@ -2,58 +2,55 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:follow_up_planner/core/utils/ist_date_time.dart';
 
 void main() {
-group('IST DateTime Tests', () {
-test('Should generate correct date key', () {
-final date = DateTime.utc(2026, 10, 30);
+  group('IST DateTime Tests', () {
+    test('Should generate correct date key', () {
+      final date = DateTime.utc(2026, 10, 30);
 
+      expect(IstDateTime.dateKey(date), '2026-10-30');
+    });
 
-  expect(IstDateTime.dateKey(date), '2026-10-30');
-});
+    test('Should identify Sunday', () {
+      final date = DateTime.utc(2026, 11, 8);
 
-test('Should identify Sunday', () {
-  final date = DateTime.utc(2026, 11, 8);
+      expect(IstDateTime.isSunday(date), true);
+    });
 
-  expect(IstDateTime.isSunday(date), true);
-});
+    test('Should identify second Saturday', () {
+      final date = DateTime.utc(2026, 11, 14);
 
-test('Should identify second Saturday', () {
-  final date = DateTime.utc(2026, 11, 14);
+      expect(IstDateTime.isSecondOrFourthSaturday(date), true);
+    });
 
-  expect(IstDateTime.isSecondOrFourthSaturday(date), true);
-});
+    test('Should identify fourth Saturday', () {
+      final date = DateTime.utc(2026, 11, 28);
 
-test('Should identify fourth Saturday', () {
-  final date = DateTime.utc(2026, 11, 28);
+      expect(IstDateTime.isSecondOrFourthSaturday(date), true);
+    });
 
-  expect(IstDateTime.isSecondOrFourthSaturday(date), true);
-});
+    test('Should identify company holiday', () {
+      final date = DateTime.utc(2026, 11, 9);
 
-test('Should identify company holiday', () {
-  final date = DateTime.utc(2026, 11, 9);
+      expect(IstDateTime.isCompanyHoliday(date), true);
+    });
 
-  expect(IstDateTime.isCompanyHoliday(date), true);
-});
+    test('Should identify working day', () {
+      final date = DateTime.utc(2026, 11, 10);
 
-test('Should identify working day', () {
-  final date = DateTime.utc(2026, 11, 10);
+      expect(IstDateTime.isWorkingDay(date), true);
+    });
 
-  expect(IstDateTime.isWorkingDay(date), true);
-});
+    test('Should identify non-working day', () {
+      final date = DateTime.utc(2026, 11, 8);
 
-test('Should identify non-working day', () {
-  final date = DateTime.utc(2026, 11, 8);
+      expect(IstDateTime.isWorkingDay(date), false);
+    });
 
-  expect(IstDateTime.isWorkingDay(date), false);
-});
+    test('Should find next working day correctly', () {
+      final date = DateTime.utc(2026, 11, 7);
 
-test('Should find next working day correctly', () {
-  final date = DateTime.utc(2026, 11, 7);
+      final result = IstDateTime.nextWorkingDay(date);
 
-  final result = IstDateTime.nextWorkingDay(date);
-
-  expect(IstDateTime.dateKey(result), '2026-11-10');
-});
-
-
-});
+      expect(IstDateTime.dateKey(result), '2026-11-10');
+    });
+  });
 }

@@ -1,3 +1,4 @@
+
 import 'package:follow_up_planner/core/constants/app_constance.dart';
 import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
 
@@ -6,6 +7,11 @@ import 'scheduling_slot_generator.dart';
 
 class NextAvailableSlotFinder {
   NextAvailableSlotFinder._();
+
+  // Normalize phone numbers before comparison.
+  static String _normalizePhoneNumber(String phoneNumber) {
+    return phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+  }
 
   static DateTime? findNextAvailableSlot({
     required DateTime requestedAt,
@@ -19,25 +25,30 @@ class NextAvailableSlotFinder {
       requestedAt.day,
     );
 
+    final normalizedPhone = _normalizePhoneNumber(phoneNumber);
+
     while (true) {
       final currentDateKey = IstDateTime.dateKey(currentDate);
 
-      // Skip weekends, company holidays and manually blocked dates.
+      // Skip Sundays, non-working Saturdays, company holidays
+      // and manually blocked dates.
       if (!IstDateTime.isWorkingDay(currentDate) ||
           blockedDateKeys.contains(currentDateKey)) {
         currentDate = currentDate.add(const Duration(days: 1));
         continue;
       }
 
+      // Get all calls scheduled for the current day.
       final dailyCalls = existingCalls.where((call) {
         return call.scheduledAt.year == currentDate.year &&
             call.scheduledAt.month == currentDate.month &&
             call.scheduledAt.day == currentDate.day;
       }).toList();
 
-      // Prevent duplicate phone numbers on the same day.
+      // Same lead cannot have two calls on the same day.
       final hasDuplicatePhone = dailyCalls.any(
-        (call) => call.phoneNumber.trim() == phoneNumber.trim(),
+        (call) =>
+            _normalizePhoneNumber(call.phoneNumber) == normalizedPhone,
       );
 
       if (hasDuplicatePhone) {
@@ -51,6 +62,7 @@ class NextAvailableSlotFinder {
         continue;
       }
 
+      // Generate available 30-minute slots.
       final availableSlots = SchedulingSlotGenerator.generateSlotsForDay(
         currentDate,
       );
@@ -61,6 +73,7 @@ class NextAvailableSlotFinder {
           continue;
         }
 
+        // Check whether another call occupies this slot.
         final isOccupied = dailyCalls.any(
           (call) => call.scheduledAt.isAtSameMomentAs(slot),
         );
@@ -70,7 +83,7 @@ class NextAvailableSlotFinder {
         }
       }
 
-      // Try the next day if no slot is available.
+      // No available slot. Try the next working day.
       currentDate = currentDate.add(const Duration(days: 1));
     }
   }

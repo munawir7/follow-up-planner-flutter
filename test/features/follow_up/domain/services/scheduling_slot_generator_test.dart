@@ -34,9 +34,7 @@ void main() {
         DateTime(2026, 11, 3),
       );
 
-      final lunchSlots = slots.where(
-        (slot) => slot.hour == 13,
-      );
+      final lunchSlots = slots.where((slot) => slot.hour == 13);
 
       expect(lunchSlots, isEmpty);
     });

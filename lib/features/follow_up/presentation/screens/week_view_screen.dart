@@ -44,9 +44,31 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
   }
 
   // Get Monday to Saturday.
-  List<DateTime> get _weekDays {
-    return List.generate(6, (index) => _weekStart.add(Duration(days: index)));
-  }
+  // Get Monday to Friday and only 1st and 3rd Saturdays.
+  // Get only working days (Monday to Friday and 1st/3rd Saturdays).
+// Exclude Sundays, 2nd/4th/5th Saturdays and company holidays.
+List<DateTime> get _weekDays {
+  final days = List.generate(
+    6,
+    (index) => _weekStart.add(Duration(days: index)),
+  );
+
+  return days.where((date) {
+    // Exclude company holidays, Sundays and other non-working days.
+    if (!IstDateTime.isWorkingDay(date)) {
+      return false;
+    }
+
+    // Only show 1st and 3rd Saturdays.
+    if (date.weekday == DateTime.saturday) {
+      final saturdayNumber = ((date.day - 1) ~/ 7) + 1;
+
+      return saturdayNumber == 1 || saturdayNumber == 3;
+    }
+
+    return true;
+  }).toList();
+}
 
   // Navigate between weeks.
   void _changeWeek(int weeks) {

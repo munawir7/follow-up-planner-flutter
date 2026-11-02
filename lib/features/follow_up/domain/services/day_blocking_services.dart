@@ -1,3 +1,4 @@
+
 import 'package:follow_up_planner/core/constants/app_constance.dart';
 import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
 import 'package:follow_up_planner/features/follow_up/domain/entities/day_blocking_result.dart';
@@ -14,9 +15,15 @@ class DayBlockingService {
     required List<FollowUpCall> existingCalls,
     Set<String> blockedDateKeys = const {},
   }) {
-    final blockedDate = DateTime.utc(date.year, date.month, date.day);
+    final blockedDate = DateTime.utc(
+      date.year,
+      date.month,
+      date.day,
+    );
+
     final blockedDateKey = IstDateTime.dateKey(blockedDate);
 
+    // Validate whether the selected day is a working day.
     if (!IstDateTime.isWorkingDay(blockedDate)) {
       throw const AppException(
         'This day is already a non-working day.',
@@ -24,6 +31,7 @@ class DayBlockingService {
       );
     }
 
+    // Prevent blocking an already blocked day.
     if (blockedDateKeys.contains(blockedDateKey)) {
       throw const AppException(
         'This date has already been blocked.',
@@ -36,7 +44,7 @@ class DayBlockingService {
         .where((call) => _isSameDay(call.scheduledAt, blockedDate))
         .toList();
 
-    // R13: Sort by priority, then original time.
+    // R13: Sort by priority, then preserve original time order.
     callsToMove.sort((a, b) {
       final priorityComparison = _priorityRank(
         a.priority,
@@ -54,10 +62,13 @@ class DayBlockingService {
         .where((call) => !_isSameDay(call.scheduledAt, blockedDate))
         .toList();
 
-    // Include the newly blocked date in the blocked-date set.
-    final updatedBlockedDateKeys = {...blockedDateKeys, blockedDateKey};
+    // Add the newly blocked date.
+    final updatedBlockedDateKeys = {
+      ...blockedDateKeys,
+      blockedDateKey,
+    };
 
-    // R14: Move calls to the earliest available future slots.
+    // R14: Reschedule calls in priority order.
     for (final call in callsToMove) {
       final nextSlot = _findNextSlot(
         requestedAt: IstDateTime.nextWorkingDay(blockedDate),
@@ -73,7 +84,9 @@ class DayBlockingService {
         );
       }
 
-      updatedCalls.add(call.copyWith(scheduledAt: nextSlot));
+      updatedCalls.add(
+        call.copyWith(scheduledAt: nextSlot),
+      );
     }
 
     return DayBlockingResult(
@@ -83,6 +96,7 @@ class DayBlockingService {
     );
   }
 
+  // Find the next available slot.
   static DateTime? _findNextSlot({
     required DateTime requestedAt,
     required String phoneNumber,
@@ -95,64 +109,102 @@ class DayBlockingService {
       requestedAt.day,
     );
 
+    final normalizedPhone = _normalizePhoneNumber(phoneNumber);
+
     while (true) {
       final currentDateKey = IstDateTime.dateKey(currentDate);
 
-      // Skip non-working and manually blocked dates.
+      // Skip Sundays, non-working Saturdays,
+      // company holidays and manually blocked dates.
       if (!IstDateTime.isWorkingDay(currentDate) ||
           blockedDateKeys.contains(currentDateKey)) {
-        currentDate = currentDate.add(const Duration(days: 1));
+        currentDate = currentDate.add(
+          const Duration(days: 1),
+        );
         continue;
       }
 
+      // Get calls scheduled on the current day.
       final dailyCalls = existingCalls.where((call) {
         return _isSameDay(call.scheduledAt, currentDate);
       }).toList();
 
-      if (dailyCalls.length < AppConstants.maxCallsPerDay) {
-        final hasDuplicatePhone = dailyCalls.any(
-          (call) => call.phoneNumber.trim() == phoneNumber.trim(),
+      // Maximum six calls per day.
+      if (dailyCalls.length >= AppConstants.maxCallsPerDay) {
+        currentDate = currentDate.add(
+          const Duration(days: 1),
+        );
+        continue;
+      }
+
+      // Prevent duplicate calls for the same lead.
+      final hasDuplicatePhone = dailyCalls.any(
+        (call) =>
+            _normalizePhoneNumber(call.phoneNumber) == normalizedPhone,
+      );
+
+      if (hasDuplicatePhone) {
+        currentDate = currentDate.add(
+          const Duration(days: 1),
+        );
+        continue;
+      }
+
+      // Generate available 30-minute slots.
+      final slots = SchedulingSlotGenerator.generateSlotsForDay(
+        currentDate,
+      );
+
+      for (final slot in slots) {
+        // Do not schedule before the requested time.
+        if (slot.isBefore(requestedAt)) {
+          continue;
+        }
+
+        // Check whether the slot is occupied.
+        final isOccupied = dailyCalls.any(
+          (call) => call.scheduledAt.isAtSameMomentAs(slot),
         );
 
-        if (!hasDuplicatePhone) {
-          final slots = SchedulingSlotGenerator.generateSlotsForDay(
-            currentDate,
-          );
-
-          for (final slot in slots) {
-            if (slot.isBefore(requestedAt)) {
-              continue;
-            }
-
-            final isOccupied = dailyCalls.any(
-              (call) => call.scheduledAt.isAtSameMomentAs(slot),
-            );
-
-            if (!isOccupied) {
-              return slot;
-            }
-          }
+        if (!isOccupied) {
+          return slot;
         }
       }
 
-      currentDate = currentDate.add(const Duration(days: 1));
+      // No available slot. Try the next day.
+      currentDate = currentDate.add(
+        const Duration(days: 1),
+      );
     }
   }
 
+  // Normalize phone numbers before comparison.
+  static String _normalizePhoneNumber(String phoneNumber) {
+    return phoneNumber.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+  }
+
+  // Hot first, Warm second, Cold last.
   static int _priorityRank(CallPriority priority) {
     switch (priority) {
       case CallPriority.hot:
         return 0;
+
       case CallPriority.warm:
         return 1;
+
       case CallPriority.cold:
         return 2;
     }
   }
 
+  // Compare calendar dates.
   static bool _isSameDay(DateTime first, DateTime second) {
     return first.year == second.year &&
         first.month == second.month &&
         first.day == second.day;
   }
+  
 }

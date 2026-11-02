@@ -161,10 +161,10 @@ void main() {
       expect(result.hasDisplacement, true);
       expect(result.displacedCall!.id, 'cold-latest');
 
-     expect(
-  result.displacedCall!.scheduledAt,
-  DateTime.utc(2026, 11, 3, 14, 0),
-);
+      expect(
+        result.displacedCall!.scheduledAt,
+        DateTime.utc(2026, 11, 3, 14, 0),
+      );
 
       expect(result.updatedCalls.length, existingCalls.length + 1);
     });
