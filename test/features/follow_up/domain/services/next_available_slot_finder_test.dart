@@ -1,16 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 import 'package:follow_up_planner/features/follow_up/domain/services/next_available_slot_finder.dart';
 
 void main() {
   group('NextAvailableSlotFinder', () {
     final requestedAt = DateTime.utc(2026, 11, 3, 10, 0);
+    final fixedNow = DateTime.utc(2026, 11, 3, 9, 0);
 
     test('should return requested time when it is available', () {
       final result = NextAvailableSlotFinder.findNextAvailableSlot(
         requestedAt: requestedAt,
         existingCalls: [],
         phoneNumber: '9123456789',
+        now: fixedNow,
       );
 
       expect(result, requestedAt);
@@ -34,6 +36,7 @@ void main() {
         requestedAt: requestedAt,
         existingCalls: existingCalls,
         phoneNumber: '9123456789',
+        now: fixedNow,
       );
 
       expect(result, DateTime.utc(2026, 11, 3, 10, 30));
@@ -44,6 +47,7 @@ void main() {
         requestedAt: DateTime.utc(2026, 11, 8, 10, 0),
         existingCalls: [],
         phoneNumber: '9123456789',
+        now: fixedNow,
       );
 
       expect(result, DateTime.utc(2026, 11, 10, 9, 30));
@@ -54,9 +58,21 @@ void main() {
         requestedAt: DateTime.utc(2026, 11, 3, 13, 0),
         existingCalls: [],
         phoneNumber: '9123456789',
+        now: fixedNow,
       );
 
       expect(result, DateTime.utc(2026, 11, 3, 14, 0));
     });
+  });
+  test('should not return a slot earlier than the current time', () {
+    final result = NextAvailableSlotFinder.findNextAvailableSlot(
+      requestedAt: DateTime.utc(2026, 11, 3, 9, 30),
+      existingCalls: [],
+      phoneNumber: '9123456789',
+
+      now: DateTime.utc(2026, 11, 3, 10, 7),
+    );
+
+    expect(result, DateTime.utc(2026, 11, 3, 10, 30));
   });
 }

@@ -1,11 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:follow_up_planner/features/follow_up/data/repositories/follow_up_repository_impl.dart';
 import 'package:follow_up_planner/core/errors/app_exception.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/schedule_diff.dart';
 import 'package:follow_up_planner/features/follow_up/data/datasources/local/follow_up_local_data_source.dart';
 import 'package:follow_up_planner/features/follow_up/data/models/follow_up_call_model.dart';
-import 'package:follow_up_planner/features/follow_up/data/repositories/follow_up_repository_impl.dart';
 
 class MockFollowUpLocalDataSource extends Mock
     implements FollowUpLocalDataSource {}
@@ -32,11 +33,12 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeFollowUpCallModel());
     registerFallbackValue(<FollowUpCallModel>[]);
+    registerFallbackValue(<String>[]);
+    registerFallbackValue(<String>{});
   });
 
   setUp(() {
     localDataSource = MockFollowUpLocalDataSource();
-
     repository = FollowUpRepositoryImpl(localDataSource: localDataSource);
   });
 
@@ -73,122 +75,6 @@ void main() {
     });
   });
 
-  // ADD CALL
-
-  group('addCall', () {
-    test('should add a follow-up call successfully', () async {
-      when(() => localDataSource.insertCall(any())).thenAnswer((_) async {});
-
-      await repository.addCall(testCall);
-
-      verify(() => localDataSource.insertCall(any())).called(1);
-    });
-
-    test('should throw AppException when adding call fails', () async {
-      when(
-        () => localDataSource.insertCall(any()),
-      ).thenThrow(Exception('Insert error'));
-
-      await expectLater(
-        repository.addCall(testCall),
-        throwsA(
-          isA<AppException>().having((e) => e.code, 'code', 'ADD_CALL_FAILED'),
-        ),
-      );
-    });
-  });
-
-  // UPDATE CALL
-
-  group('updateCall', () {
-    test('should update a follow-up call successfully', () async {
-      when(() => localDataSource.updateCall(any())).thenAnswer((_) async {});
-
-      await repository.updateCall(testCall);
-
-      verify(() => localDataSource.updateCall(any())).called(1);
-    });
-
-    test('should throw AppException when updating call fails', () async {
-      when(
-        () => localDataSource.updateCall(any()),
-      ).thenThrow(Exception('Update error'));
-
-      await expectLater(
-        repository.updateCall(testCall),
-        throwsA(
-          isA<AppException>().having(
-            (e) => e.code,
-            'code',
-            'UPDATE_CALL_FAILED',
-          ),
-        ),
-      );
-    });
-  });
-
-  // DELETE CALL
-
-  group('deleteCall', () {
-    test('should delete a follow-up call successfully', () async {
-      when(
-        () => localDataSource.deleteCall('call_001'),
-      ).thenAnswer((_) async {});
-
-      await repository.deleteCall('call_001');
-
-      verify(() => localDataSource.deleteCall('call_001')).called(1);
-    });
-
-    test('should throw AppException when deleting call fails', () async {
-      when(
-        () => localDataSource.deleteCall('call_001'),
-      ).thenThrow(Exception('Delete error'));
-
-      await expectLater(
-        repository.deleteCall('call_001'),
-        throwsA(
-          isA<AppException>().having(
-            (e) => e.code,
-            'code',
-            'DELETE_CALL_FAILED',
-          ),
-        ),
-      );
-    });
-  });
-
-  // REPLACE ALL CALLS
-
-  group('replaceAllCalls', () {
-    test('should replace all calls successfully', () async {
-      when(
-        () => localDataSource.replaceAllCalls(any()),
-      ).thenAnswer((_) async {});
-
-      await repository.replaceAllCalls([testCall]);
-
-      verify(() => localDataSource.replaceAllCalls(any())).called(1);
-    });
-
-    test('should throw AppException when replacing calls fails', () async {
-      when(
-        () => localDataSource.replaceAllCalls(any()),
-      ).thenThrow(Exception('Restore error'));
-
-      await expectLater(
-        repository.replaceAllCalls([testCall]),
-        throwsA(
-          isA<AppException>().having(
-            (e) => e.code,
-            'code',
-            'RESTORE_CALLS_FAILED',
-          ),
-        ),
-      );
-    });
-  });
-
   // GET BLOCKED DATES
 
   group('getBlockedDates', () {
@@ -198,8 +84,6 @@ void main() {
       ).thenAnswer((_) async => ['2026-10-30', '2026-10-31']);
 
       final result = await repository.getBlockedDates();
-
-      expect(result, isA<Set<String>>());
 
       expect(result, {'2026-10-30', '2026-10-31'});
 
@@ -227,103 +111,115 @@ void main() {
     );
   });
 
-  // BLOCK DATE
+  // APPLY SCHEDULE DIFF
 
-  group('blockDate', () {
-    test('should block a date successfully', () async {
+  group('applyScheduleDiff', () {
+    test('should apply schedule changes successfully', () async {
+      final diff = ScheduleDiff(
+        inserted: [testCall],
+        updated: [],
+        deletedIds: [],
+      );
+
       when(
-        () => localDataSource.blockDate('2026-10-30'),
+        () => localDataSource.applyScheduleDiff(
+          inserted: any(named: 'inserted'),
+          updated: any(named: 'updated'),
+          deletedIds: any(named: 'deletedIds'),
+          blockedDateKeysToAdd: any(named: 'blockedDateKeysToAdd'),
+          blockedDateKeysToRemove: any(named: 'blockedDateKeysToRemove'),
+        ),
       ).thenAnswer((_) async {});
 
-      await repository.blockDate('2026-10-30');
+      await repository.applyScheduleDiff(
+        diff: diff,
+        blockedDateKeysToAdd: {'2026-10-30'},
+        blockedDateKeysToRemove: {},
+      );
 
-      verify(() => localDataSource.blockDate('2026-10-30')).called(1);
+      verify(
+        () => localDataSource.applyScheduleDiff(
+          inserted: any(named: 'inserted'),
+          updated: any(named: 'updated'),
+          deletedIds: any(named: 'deletedIds'),
+          blockedDateKeysToAdd: any(named: 'blockedDateKeysToAdd'),
+          blockedDateKeysToRemove: any(named: 'blockedDateKeysToRemove'),
+        ),
+      ).called(1);
     });
 
-    test('should throw AppException when blocking date fails', () async {
+    test('should throw AppException when applying changes fails', () async {
+      final diff = ScheduleDiff(inserted: [testCall]);
+
       when(
-        () => localDataSource.blockDate('2026-10-30'),
-      ).thenThrow(Exception('Block date error'));
+        () => localDataSource.applyScheduleDiff(
+          inserted: any(named: 'inserted'),
+          updated: any(named: 'updated'),
+          deletedIds: any(named: 'deletedIds'),
+          blockedDateKeysToAdd: any(named: 'blockedDateKeysToAdd'),
+          blockedDateKeysToRemove: any(named: 'blockedDateKeysToRemove'),
+        ),
+      ).thenThrow(Exception('Database update error'));
 
       await expectLater(
-        repository.blockDate('2026-10-30'),
+        repository.applyScheduleDiff(
+          diff: diff,
+          blockedDateKeysToAdd: {},
+          blockedDateKeysToRemove: {},
+        ),
         throwsA(
           isA<AppException>().having(
             (e) => e.code,
             'code',
-            'BLOCK_DATE_FAILED',
+            'APPLY_SCHEDULE_DIFF_FAILED',
           ),
         ),
       );
     });
   });
 
-  // UNBLOCK DATE
+  // REPLACE SCHEDULE (UNDO/REDO)
 
-  group('unblockDate', () {
-    test('should unblock a date successfully', () async {
+  group('replaceSchedule', () {
+    test('should replace the complete schedule successfully', () async {
       when(
-        () => localDataSource.unblockDate('2026-10-30'),
+        () => localDataSource.replaceSchedule(
+          calls: any(named: 'calls'),
+          blockedDateKeys: any(named: 'blockedDateKeys'),
+        ),
       ).thenAnswer((_) async {});
 
-      await repository.unblockDate('2026-10-30');
+      await repository.replaceSchedule(
+        calls: [testCall],
+        blockedDateKeys: {'2026-10-30'},
+      );
 
-      verify(() => localDataSource.unblockDate('2026-10-30')).called(1);
+      verify(
+        () => localDataSource.replaceSchedule(
+          calls: any(named: 'calls'),
+          blockedDateKeys: any(named: 'blockedDateKeys'),
+        ),
+      ).called(1);
     });
 
-    test('should throw AppException when unblocking date fails', () async {
+    test('should throw AppException when replacing schedule fails', () async {
       when(
-        () => localDataSource.unblockDate('2026-10-30'),
-      ).thenThrow(Exception('Unblock date error'));
+        () => localDataSource.replaceSchedule(
+          calls: any(named: 'calls'),
+          blockedDateKeys: any(named: 'blockedDateKeys'),
+        ),
+      ).thenThrow(Exception('Restore error'));
 
       await expectLater(
-        repository.unblockDate('2026-10-30'),
+        repository.replaceSchedule(calls: [testCall], blockedDateKeys: {}),
         throwsA(
           isA<AppException>().having(
             (e) => e.code,
             'code',
-            'UNBLOCK_DATE_FAILED',
+            'REPLACE_SCHEDULE_FAILED',
           ),
         ),
       );
     });
-  });
-
-  // REPLACE BLOCKED DATES
-
-  group('replaceBlockedDates', () {
-    test('should replace blocked dates successfully', () async {
-      final dates = {'2026-10-30', '2026-10-31'};
-
-      when(
-        () => localDataSource.replaceBlockedDates(any()),
-      ).thenAnswer((_) async {});
-
-      await repository.replaceBlockedDates(dates);
-
-      verify(() => localDataSource.replaceBlockedDates(any())).called(1);
-    });
-
-    test(
-      'should throw AppException when replacing blocked dates fails',
-      () async {
-        final dates = {'2026-10-30'};
-
-        when(
-          () => localDataSource.replaceBlockedDates(any()),
-        ).thenThrow(Exception('Restore blocked dates error'));
-
-        await expectLater(
-          repository.replaceBlockedDates(dates),
-          throwsA(
-            isA<AppException>().having(
-              (e) => e.code,
-              'code',
-              'RESTORE_BLOCKED_DATES_FAILED',
-            ),
-          ),
-        );
-      },
-    );
   });
 }

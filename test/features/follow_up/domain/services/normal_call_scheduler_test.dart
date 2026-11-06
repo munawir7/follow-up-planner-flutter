@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 import 'package:follow_up_planner/features/follow_up/domain/services/normal_call_scheduler.dart';
 
@@ -35,6 +35,7 @@ void main() {
       final result = NormalCallScheduler.scheduleCall(
         newCall: call,
         existingCalls: [],
+        now: DateTime.utc(2026, 11, 3, 9, 0),
       );
 
       expect(
@@ -61,6 +62,7 @@ void main() {
       final result = NormalCallScheduler.scheduleCall(
         newCall: coldCall,
         existingCalls: [existingCall],
+        now: DateTime.utc(2026, 11, 3, 9, 0),
       );
 
       expect(

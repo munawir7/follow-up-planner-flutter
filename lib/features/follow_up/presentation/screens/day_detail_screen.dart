@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:follow_up_planner/features/follow_up/presentation/extensions/call_priority_extensions.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 import 'package:follow_up_planner/core/utils/ist_date_time.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 import 'package:follow_up_planner/features/follow_up/presentation/providers/follow_up_provider.dart';
 import 'package:follow_up_planner/features/follow_up/presentation/screens/add_call_screen.dart';
 
@@ -12,32 +14,11 @@ class DayDetailScreen extends StatelessWidget {
   final DateTime date;
 
   String _monthName(int month) {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-
-    return months[month - 1];
+    return DateFormat('MMMM').format(DateTime(2000, month));
   }
 
   String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute;
-
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
-
-    return '$displayHour:${minute.toString().padLeft(2, '0')} $period';
+    return DateFormat('h:mm a').format(dateTime);
   }
 
   @override
@@ -53,6 +34,10 @@ class DayDetailScreen extends StatelessWidget {
     final isBlocked = provider.blockedDateKeys.contains(
       IstDateTime.dateKey(date),
     );
+    final todayKey = IstDateTime.dateKey(IstDateTime.nowIst());
+    final selectedDateKey = IstDateTime.dateKey(date);
+
+    final isPastDate = selectedDateKey.compareTo(todayKey) < 0;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Day Details')),
@@ -124,31 +109,40 @@ class DayDetailScreen extends StatelessWidget {
                   ),
           ),
 
-          // Block day button.
-          if (!isBlocked)
+          if (isPastDate && !isBlocked)
             Padding(
-              padding: const EdgeInsets.all(16),
-
-              child: SizedBox(
-                width: double.infinity,
-
-                child: ElevatedButton.icon(
-                  onPressed: provider.isSaving
-                      ? null
-                      : () => _confirmBlockDay(context),
-
-                  icon: const Icon(Icons.block),
-
-                  label: const Text('Block This Day'),
-
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Past dates cannot be Blocked.',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: provider.isSaving || (!isBlocked && isPastDate)
+                    ? null
+                    : () {
+                        if (isBlocked) {
+                          _confirmUnblockDay(context);
+                        } else {
+                          _confirmBlockDay(context);
+                        }
+                      },
+                icon: Icon(isBlocked ? Icons.lock_open : Icons.block),
+                label: Text(isBlocked ? 'Unblock This Day' : 'Block This Day'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isBlocked ? Colors.green : Colors.redAccent,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -160,11 +154,7 @@ class DayDetailScreen extends StatelessWidget {
     FollowUpCall call,
     bool isSaving,
   ) {
-    final priorityColor = switch (call.priority) {
-      CallPriority.hot => Colors.red,
-      CallPriority.warm => Colors.orange,
-      CallPriority.cold => Colors.blue,
-    };
+    final priorityColor = call.priority.color;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -405,6 +395,50 @@ class DayDetailScreen extends StatelessWidget {
         ),
 
         backgroundColor: result != null ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
+  Future<void> _confirmUnblockDay(BuildContext context) async {
+    final shoulUnbloack = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text('Unblock This Day'),
+          content: Text(
+            'This day will become available for future scheduling.'
+            'Previosly rescheduled calls will remain in their current slots.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+
+              child: Text('Unblock day'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shoulUnbloack != true || !context.mounted) {
+      return;
+    }
+    final provider = context.read<FollowUpProvider>();
+    final success = await provider.unblockDay(date);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Day unblocked successfully!'
+              : provider.errorMessage ?? 'unable to unblock this day',
+        ),
+        backgroundColor: success ? Colors.green : Colors.red,
       ),
     );
   }

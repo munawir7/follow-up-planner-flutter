@@ -1,4 +1,4 @@
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 class ScheduleSnapshot {
   final List<FollowUpCall> calls;

@@ -9,6 +9,7 @@ class FollowUpLocalDataSource {
   FollowUpLocalDataSource({required AppDatabase appDatabase})
     : _appDatabase = appDatabase;
 
+  // Fetch all calls.
   Future<List<FollowUpCallModel>> getAllCalls() async {
     final db = await _appDatabase.database;
 
@@ -20,71 +21,7 @@ class FollowUpLocalDataSource {
     return result.map((row) => FollowUpCallModel.fromMap(row)).toList();
   }
 
-  Future<void> insertCall(FollowUpCallModel call) async {
-    final db = await _appDatabase.database;
-
-    await db.insert(
-      AppDatabase.callsTable,
-      call.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<void> insertCalls(List<FollowUpCallModel> calls) async {
-    final db = await _appDatabase.database;
-
-    await db.transaction((transaction) async {
-      final batch = transaction.batch();
-
-      for (final call in calls) {
-        batch.insert(
-          AppDatabase.callsTable,
-          call.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-
-      await batch.commit(noResult: true);
-    });
-  }
-
-  Future<void> updateCall(FollowUpCallModel call) async {
-    final db = await _appDatabase.database;
-
-    await db.update(
-      AppDatabase.callsTable,
-      call.toMap(),
-      where: 'id = ?',
-      whereArgs: [call.id],
-    );
-  }
-
-  Future<void> deleteCall(String id) async {
-    final db = await _appDatabase.database;
-
-    await db.delete(AppDatabase.callsTable, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> replaceAllCalls(List<FollowUpCallModel> calls) async {
-    final db = await _appDatabase.database;
-
-    await db.transaction((transaction) async {
-      await transaction.delete(AppDatabase.callsTable);
-
-      final batch = transaction.batch();
-
-      for (final call in calls) {
-        batch.insert(
-          AppDatabase.callsTable,
-          call.toMap(),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-
-      await batch.commit(noResult: true);
-    });
-  }
-
+  // Fetch all blocked dates.
   Future<List<String>> getBlockedDates() async {
     final db = await _appDatabase.database;
 
@@ -97,33 +34,54 @@ class FollowUpLocalDataSource {
     return result.map((row) => row['date_key'] as String).toList();
   }
 
-  Future<void> blockDate(String dateKey) async {
-    final db = await _appDatabase.database;
-
-    await db.insert(AppDatabase.blockedDaysTable, {
-      'date_key': dateKey,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-  }
-
-  Future<void> unblockDate(String dateKey) async {
-    final db = await _appDatabase.database;
-
-    await db.delete(
-      AppDatabase.blockedDaysTable,
-      where: 'date_key = ?',
-      whereArgs: [dateKey],
-    );
-  }
-
-  Future<void> replaceBlockedDates(List<String> dateKeys) async {
+  // Apply only changed records in one SQLite transaction.
+  Future<void> applyScheduleDiff({
+    required List<FollowUpCallModel> inserted,
+    required List<FollowUpCallModel> updated,
+    required List<String> deletedIds,
+    required Set<String> blockedDateKeysToAdd,
+    required Set<String> blockedDateKeysToRemove,
+  }) async {
     final db = await _appDatabase.database;
 
     await db.transaction((transaction) async {
-      await transaction.delete(AppDatabase.blockedDaysTable);
-
       final batch = transaction.batch();
 
-      for (final dateKey in dateKeys) {
+      // Delete removed calls.
+      for (final id in deletedIds) {
+        batch.delete(AppDatabase.callsTable, where: 'id = ?', whereArgs: [id]);
+      }
+
+      // Update modified calls.
+      for (final call in updated) {
+        batch.update(
+          AppDatabase.callsTable,
+          call.toMap(),
+          where: 'id = ?',
+          whereArgs: [call.id],
+        );
+      }
+
+      // Insert new calls.
+      for (final call in inserted) {
+        batch.insert(
+          AppDatabase.callsTable,
+          call.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.abort,
+        );
+      }
+
+      // Remove unblocked dates.
+      for (final dateKey in blockedDateKeysToRemove) {
+        batch.delete(
+          AppDatabase.blockedDaysTable,
+          where: 'date_key = ?',
+          whereArgs: [dateKey],
+        );
+      }
+
+      // Add newly blocked dates.
+      for (final dateKey in blockedDateKeysToAdd) {
         batch.insert(
           AppDatabase.blockedDaysTable,
           {'date_key': dateKey},
@@ -135,6 +93,7 @@ class FollowUpLocalDataSource {
     });
   }
 
+  // Restore a complete schedule for undo/redo.
   Future<void> replaceSchedule({
     required List<FollowUpCallModel> calls,
     required Set<String> blockedDateKeys,

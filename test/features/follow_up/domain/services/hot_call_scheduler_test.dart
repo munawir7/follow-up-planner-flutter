@@ -1,7 +1,8 @@
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:follow_up_planner/core/errors/app_exception.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 import 'package:follow_up_planner/features/follow_up/domain/services/hot_call_scheduler.dart';
 
 void main() {
@@ -37,6 +38,7 @@ void main() {
       final result = HotCallScheduler.scheduleHotCall(
         newCall: hotCall,
         existingCalls: [],
+        now: DateTime.utc(2026, 11, 3, 9, 0),
       );
 
       expect(
@@ -68,6 +70,7 @@ void main() {
         final result = HotCallScheduler.scheduleHotCall(
           newCall: hotCall,
           existingCalls: existingCalls,
+          now: DateTime.utc(2026, 11, 3, 10, 7),
         );
 
         expect(
@@ -106,6 +109,7 @@ void main() {
         () => HotCallScheduler.scheduleHotCall(
           newCall: hotCall,
           existingCalls: existingCalls,
+          now: DateTime.utc(2026, 11, 3, 10, 7),
         ),
         throwsA(isA<AppException>()),
       );
@@ -151,6 +155,7 @@ void main() {
       final result = HotCallScheduler.scheduleHotCall(
         newCall: hotCall,
         existingCalls: existingCalls,
+        now: DateTime.utc(2026, 11, 3, 10, 7),
       );
 
       expect(
@@ -167,6 +172,47 @@ void main() {
       );
 
       expect(result.updatedCalls.length, existingCalls.length + 1);
+    });
+
+    test('should not schedule a Hot call before the current time', () {
+      final hotCall = createCall(
+        id: 'hot-past',
+        scheduledAt: DateTime.utc(2026, 11, 3),
+        priority: CallPriority.hot,
+        phoneNumber: '9876543211',
+      );
+
+      final result = HotCallScheduler.scheduleHotCall(
+        newCall: hotCall,
+        existingCalls: [],
+        now: DateTime.utc(2026, 11, 3, 10, 7),
+      );
+
+      expect(
+        result.scheduledCall.scheduledAt,
+        DateTime.utc(2026, 11, 3, 10, 30),
+      );
+    });
+    test('schedules Hot call on the next working day when requested on sunday',(){
+       final sunday = DateTime.utc(2026, 11, 8);
+
+       final hotCall = createCall(
+        id: 'hot-sunday',
+       scheduledAt: sunday,
+       priority: CallPriority.hot,
+       phoneNumber: '9876543212',
+       );
+
+       final result = HotCallScheduler.scheduleHotCall(
+        newCall: hotCall,
+        existingCalls: [],
+        now: DateTime.utc(2026, 11, 8, 9, 0),
+        );
+
+        expect(
+          result.scheduledCall.scheduledAt,
+          DateTime.utc(2026, 11, 10, 9, 30),
+          );
     });
   });
 }

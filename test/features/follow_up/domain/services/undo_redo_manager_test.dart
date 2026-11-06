@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 import 'package:follow_up_planner/features/follow_up/domain/entities/schedule_snapshot.dart';
 import 'package:follow_up_planner/features/follow_up/domain/services/undo_redo_manager.dart';

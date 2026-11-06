@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/core/constants/app_constants.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/presentation/screens/add_call_screen.dart';
 
 import '../../domain/services/scheduling_slot_generator.dart';
 
@@ -12,75 +14,113 @@ class DailyTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Generate all valid 30-minute slots.
+    // Generate all valid slots for the selected day.
     final slots = SchedulingSlotGenerator.generateSlotsForDay(date);
 
-    return ListView.builder(
-      // Extra bottom padding prevents the FAB from covering the last slot.
+    // Handle days with no available slots.
+    if (slots.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.event_busy, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            const Text(
+              'No available time slots for this day.',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Build timeline items dynamically.
+    final timelineItems = <Widget>[];
+    var lunchBreakInserted = false;
+
+    for (final slot in slots) {
+      // Insert lunch break before the first slot at or after lunch end.
+      if (!lunchBreakInserted && slot.hour >= AppConstants.lunchEndHour) {
+        timelineItems.add(_buildLunchBreak());
+        lunchBreakInserted = true;
+      }
+
+      // Find whether this slot contains a scheduled call.
+      FollowUpCall? scheduledCall;
+
+      for (final call in calls) {
+        if (call.scheduledAt.year == slot.year &&
+            call.scheduledAt.month == slot.month &&
+            call.scheduledAt.day == slot.day &&
+            call.scheduledAt.hour == slot.hour &&
+            call.scheduledAt.minute == slot.minute) {
+          scheduledCall = call;
+          break;
+        }
+      }
+
+      timelineItems.add(
+        _buildTimeSlot(context: context, slot: slot, call: scheduledCall),
+      );
+    }
+
+    return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-
-      itemCount: slots.length + 1,
-
-      itemBuilder: (context, index) {
-        // Insert lunch break after the seventh slot.
-        if (index == 7) {
-          return _buildLunchBreak();
-        }
-
-        final slotIndex = index < 7 ? index : index - 1;
-        final slot = slots[slotIndex];
-
-        // Find whether this slot contains a scheduled call.
-        FollowUpCall? scheduledCall;
-
-        for (final call in calls) {
-          if (call.scheduledAt.year == slot.year &&
-              call.scheduledAt.month == slot.month &&
-              call.scheduledAt.day == slot.day &&
-              call.scheduledAt.hour == slot.hour &&
-              call.scheduledAt.minute == slot.minute) {
-            scheduledCall = call;
-            break;
-          }
-        }
-
-        return _buildTimeSlot(slot: slot, call: scheduledCall);
-      },
+      children: timelineItems,
     );
   }
 
-  Widget _buildTimeSlot({required DateTime slot, required FollowUpCall? call}) {
+  Widget _buildTimeSlot({
+    required BuildContext context,
+    required DateTime slot,
+    required FollowUpCall? call,
+  }) {
     final time =
         '${slot.hour.toString().padLeft(2, '0')}:'
         '${slot.minute.toString().padLeft(2, '0')}';
 
     // Available time slot.
     if (call == null) {
-      return Container(
-        height: 65,
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 65,
-              child: Text(
-                time,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+      return InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AddCallScreen(initialDateTime: slot),
+            ),
+          );
+        },
+        child: Container(
+          height: 65,
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 65,
+                child: Text(
+                  time,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
-            ),
-            const Icon(Icons.add_circle_outline, size: 18, color: Colors.grey),
-            const SizedBox(width: 8),
-            const Text('Available', style: TextStyle(color: Colors.grey)),
-          ],
+              const Icon(
+                Icons.add_circle_outline,
+                size: 18,
+                color: Colors.blue,
+              ),
+              const SizedBox(width: 8),
+              const Text('Available', style: TextStyle(color: Colors.grey)),
+            ],
+          ),
         ),
       );
     }

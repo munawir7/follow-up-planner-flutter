@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 import 'package:follow_up_planner/core/utils/ist_date_time.dart';
 
@@ -10,7 +11,12 @@ import '../widgets/summary_bar.dart';
 import 'add_call_screen.dart';
 
 class WeekViewScreen extends StatefulWidget {
-  const WeekViewScreen({super.key});
+  final DateTime Function() nowProvider;
+
+  const WeekViewScreen({
+    super.key,
+    this.nowProvider = IstDateTime.nowIst,
+  });
 
   @override
   State<WeekViewScreen> createState() => _WeekViewScreenState();
@@ -18,12 +24,12 @@ class WeekViewScreen extends StatefulWidget {
 
 class _WeekViewScreenState extends State<WeekViewScreen> {
   late DateTime _selectedDate;
+
   @override
   void initState() {
     super.initState();
 
-    final today = IstDateTime.nowIst();
-
+   final today = widget.nowProvider();
     final todayDate = DateTime.utc(today.year, today.month, today.day);
 
     _selectedDate = IstDateTime.isWorkingDay(todayDate)
@@ -43,34 +49,6 @@ class _WeekViewScreenState extends State<WeekViewScreen> {
     return _weekStart.add(const Duration(days: 7));
   }
 
-  // Get Monday to Saturday.
-  // Get Monday to Friday and only 1st and 3rd Saturdays.
-  // Get only working days (Monday to Friday and 1st/3rd Saturdays).
-// Exclude Sundays, 2nd/4th/5th Saturdays and company holidays.
-List<DateTime> get _weekDays {
-  final days = List.generate(
-    6,
-    (index) => _weekStart.add(Duration(days: index)),
-  );
-
-  return days.where((date) {
-    // Exclude company holidays, Sundays and other non-working days.
-    if (!IstDateTime.isWorkingDay(date)) {
-      return false;
-    }
-
-    // Only show 1st and 3rd Saturdays.
-    if (date.weekday == DateTime.saturday) {
-      final saturdayNumber = ((date.day - 1) ~/ 7) + 1;
-
-      return saturdayNumber == 1 || saturdayNumber == 3;
-    }
-
-    return true;
-  }).toList();
-}
-
-  // Navigate between weeks.
   void _changeWeek(int weeks) {
     setState(() {
       _selectedDate = _selectedDate.add(Duration(days: weeks * 7));
@@ -85,22 +63,7 @@ List<DateTime> get _weekDays {
   }
 
   String _monthName(int month) {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-
-    return months[month - 1];
+    return DateFormat('MMMM').format(DateTime(2000, month));
   }
 
   String _dayName(int weekday) {
@@ -108,9 +71,136 @@ List<DateTime> get _weekDays {
     return days[weekday - 1];
   }
 
+  Future<void> _handleUndo() async {
+    final provider = context.read<FollowUpProvider>();
+
+    final previousBlockedDates = Set<String>.from(provider.blockedDateKeys);
+
+    final success = await provider.undo();
+
+    if (!mounted) return;
+
+    if (success) {
+      final updatedBlockedDates = provider.blockedDateKeys;
+
+      final removedDates = previousBlockedDates.difference(updatedBlockedDates);
+
+      final addedDates = updatedBlockedDates.difference(previousBlockedDates);
+
+      String message = 'Undid: Schedule Change';
+
+      if (removedDates.isNotEmpty) {
+        final date = DateTime.parse(removedDates.first);
+        message = 'Undid: Block ${date.day} ${_monthName(date.month)}';
+      } else if (addedDates.isNotEmpty) {
+        final date = DateTime.parse(addedDates.first);
+        message = 'Undid: Unblock ${date.day} ${_monthName(date.month)}';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.errorMessage ?? 'Unable to undo the last action.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleRedo() async {
+    final provider = context.read<FollowUpProvider>();
+
+    final previousBlockedDates = Set<String>.from(provider.blockedDateKeys);
+
+    final success = await provider.redo();
+
+    if (!mounted) return;
+
+    if (success) {
+      final updatedBlockedDates = provider.blockedDateKeys;
+
+      final addedDates = updatedBlockedDates.difference(previousBlockedDates);
+
+      final removedDates = previousBlockedDates.difference(updatedBlockedDates);
+
+      String message = 'Redid: Schedule Change';
+
+      if (addedDates.isNotEmpty) {
+        final date = DateTime.parse(addedDates.first);
+        message = 'Redid: Block ${date.day} ${_monthName(date.month)}';
+      } else if (removedDates.isNotEmpty) {
+        final date = DateTime.parse(removedDates.first);
+        message = 'Redid: Unblock ${date.day} ${_monthName(date.month)}';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.errorMessage ?? 'Unable to redo the last action.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FollowUpProvider>();
+
+    if (provider.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (provider.errorMessage != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Follow-Up Planner')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                const Text(
+                  'Unable to load your schedule.',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(provider.errorMessage!, textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: provider.isLoading
+                      ? null
+                      : () => provider.loadSchedule(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Calculate the current week's dates once per build.
+    final weekStart = _weekStart;
+    final weekEnd = _weekEnd;
+
+    final weekDays = List.generate(
+      6,
+      (index) => weekStart.add(Duration(days: index)),
+    ).where(IstDateTime.isWorkingDay).toList();
 
     // Get calls scheduled for the selected day.
     final dailyCalls = provider.calls.where((call) {
@@ -119,11 +209,10 @@ List<DateTime> get _weekDays {
           call.scheduledAt.day == _selectedDate.day;
     }).toList()..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
-    // Get all calls scheduled during the selected week.
-    // Monday is included, next Monday is excluded.
+    // Get calls scheduled during the selected week.
     final weeklyCalls = provider.calls.where((call) {
-      return !call.scheduledAt.isBefore(_weekStart) &&
-          call.scheduledAt.isBefore(_weekEnd);
+      return !call.scheduledAt.isBefore(weekStart) &&
+          call.scheduledAt.isBefore(weekEnd);
     }).toList();
 
     final dateKey = IstDateTime.dateKey(_selectedDate);
@@ -140,19 +229,18 @@ List<DateTime> get _weekDays {
             tooltip: 'Undo',
             icon: const Icon(Icons.undo),
             onPressed: provider.canUndo && !provider.isSaving
-                ? () => provider.undo()
+                ? _handleUndo
                 : null,
           ),
           IconButton(
             tooltip: 'Redo',
             icon: const Icon(Icons.redo),
             onPressed: provider.canRedo && !provider.isSaving
-                ? () => provider.redo()
+                ? _handleRedo
                 : null,
           ),
         ],
       ),
-
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -160,54 +248,51 @@ List<DateTime> get _weekDays {
           _buildWeekHeader(),
 
           // Working-day selector.
-          _buildDaySelector(),
+          _buildDaySelector(weekDays),
 
           const Divider(height: 1),
 
-          // Selected day information.
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${_dayName(_selectedDate.weekday)}, '
-                        '${_selectedDate.day} '
-                        '${_monthName(_selectedDate.month)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${dailyCalls.length} calls scheduled',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DayDetailScreen(date: _selectedDate),
                   ),
-                ),
-                IconButton(
-                  tooltip: 'View Day Details',
-                  icon: const Icon(Icons.arrow_forward_ios, size: 18),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            DayDetailScreen(date: _selectedDate),
-                      ),
-                    );
-                  },
-                ),
-              ],
+                );
+              },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_dayName(_selectedDate.weekday)}, '
+                          '${_selectedDate.day} '
+                          '${_monthName(_selectedDate.month)}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${dailyCalls.length} calls scheduled',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 18),
+                ],
+              ),
             ),
           ),
 
@@ -303,16 +388,16 @@ List<DateTime> get _weekDays {
     );
   }
 
-  // Monday to Saturday selector.
-  Widget _buildDaySelector() {
+  // Working-day selector.
+  Widget _buildDaySelector(List<DateTime> weekDays) {
     return SizedBox(
       height: 85,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: _weekDays.length,
+        itemCount: weekDays.length,
         itemBuilder: (context, index) {
-          final date = _weekDays[index];
+          final date = weekDays[index];
 
           final isSelected =
               IstDateTime.dateKey(date) == IstDateTime.dateKey(_selectedDate);

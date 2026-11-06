@@ -1,10 +1,11 @@
-import 'package:follow_up_planner/core/constants/app_constance.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/core/constants/app_constants.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/utils/ist_date_time.dart';
 import '../entities/scheduling_result.dart';
 import 'next_available_slot_finder.dart';
+import '../../../../core/utils/phone_utils.dart';
 import 'scheduling_slot_generator.dart';
 
 class HotCallScheduler {
@@ -14,17 +15,23 @@ class HotCallScheduler {
     required FollowUpCall newCall,
     required List<FollowUpCall> existingCalls,
     Set<String> blockedDateKeys = const {},
+    DateTime? now,
   }) {
     if (newCall.priority != CallPriority.hot) {
       throw ArgumentError(
         'Only Hot calls can be scheduled using HotCallScheduler.',
       );
     }
+    final currentTime = now ?? IstDateTime.nowIst();
+    final normalizedPhone = PhoneUtils.normalize(newCall.phoneNumber);
+    final searchStart = newCall.requestedAt.isAfter(currentTime)
+        ? newCall.requestedAt
+        : currentTime;
 
     final requestedDay = DateTime.utc(
-      newCall.requestedAt.year,
-      newCall.requestedAt.month,
-      newCall.requestedAt.day,
+      searchStart.year,
+      searchStart.month,
+      searchStart.day,
     );
 
     // Find the first two eligible working days.
@@ -40,11 +47,11 @@ class HotCallScheduler {
     // First, try to find a normal available slot.
     for (final day in allowedDays) {
       final dailyCalls = existingCalls.where((call) {
-        return _isSameDay(call.scheduledAt, day);
+        return IstDateTime.isSameDay(call.scheduledAt, day);
       }).toList();
 
       final hasDuplicatePhone = dailyCalls.any(
-        (call) => call.phoneNumber.trim() == newCall.phoneNumber.trim(),
+        (call) => PhoneUtils.normalize(call.phoneNumber) == normalizedPhone,
       );
 
       if (hasDuplicatePhone ||
@@ -55,7 +62,7 @@ class HotCallScheduler {
       final slots = SchedulingSlotGenerator.generateSlotsForDay(day);
 
       for (final slot in slots) {
-        if (slot.isBefore(newCall.requestedAt)) {
+        if (slot.isBefore(searchStart)) {
           continue;
         }
 
@@ -74,14 +81,14 @@ class HotCallScheduler {
       }
     }
 
-    // R12: Find Cold calls on the original requested day.
-    final requestedDayCalls = existingCalls.where((call) {
-      return _isSameDay(call.scheduledAt, requestedDay);
+    // R12: Find calls on the first eligible working day.
+    final firstWorkingDayCalls = existingCalls.where((call) {
+      return IstDateTime.isSameDay(call.scheduledAt, firstWorkingDay);
     }).toList();
 
     // Prevent duplicate phone numbers.
-    final hasDuplicateHotPhone = requestedDayCalls.any(
-      (call) => call.phoneNumber.trim() == newCall.phoneNumber.trim(),
+    final hasDuplicateHotPhone = firstWorkingDayCalls.any(
+      (call) => PhoneUtils.normalize(call.phoneNumber) == normalizedPhone,
     );
 
     if (hasDuplicateHotPhone) {
@@ -94,11 +101,11 @@ class HotCallScheduler {
     // Find Cold calls that can be displaced without moving
     // the Hot call backward from its requested time.
     final coldCalls =
-        requestedDayCalls
+        firstWorkingDayCalls
             .where(
               (call) =>
                   call.priority == CallPriority.cold &&
-                  !call.scheduledAt.isBefore(newCall.requestedAt),
+                  !call.scheduledAt.isBefore(searchStart),
             )
             .toList()
           ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
@@ -120,6 +127,7 @@ class HotCallScheduler {
 
     // Find a new slot for the displaced Cold call.
     final newColdSlot = NextAvailableSlotFinder.findNextAvailableSlot(
+      now: currentTime,
       requestedAt: coldCallToMove.scheduledAt.add(
         const Duration(minutes: AppConstants.callDurationMinutes),
       ),
@@ -163,11 +171,5 @@ class HotCallScheduler {
     }
 
     return date;
-  }
-
-  static bool _isSameDay(DateTime first, DateTime second) {
-    return first.year == second.year &&
-        first.month == second.month &&
-        first.day == second.day;
   }
 }
