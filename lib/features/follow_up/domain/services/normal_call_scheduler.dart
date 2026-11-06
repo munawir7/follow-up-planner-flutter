@@ -1,4 +1,4 @@
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../entities/scheduling_result.dart';
@@ -11,6 +11,7 @@ class NormalCallScheduler {
     required FollowUpCall newCall,
     required List<FollowUpCall> existingCalls,
     Set<String> blockedDateKeys = const {},
+    DateTime? now,
   }) {
     if (newCall.priority == CallPriority.hot) {
       throw ArgumentError(
@@ -23,6 +24,7 @@ class NormalCallScheduler {
       phoneNumber: newCall.phoneNumber,
       existingCalls: existingCalls,
       blockedDateKeys: blockedDateKeys,
+      now: now,
     );
 
     if (availableSlot == null) {

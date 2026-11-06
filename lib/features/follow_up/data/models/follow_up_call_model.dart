@@ -1,4 +1,4 @@
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 class FollowUpCallModel extends FollowUpCall {
   const FollowUpCallModel({
@@ -32,9 +32,37 @@ class FollowUpCallModel extends FollowUpCall {
       phoneNumber: map['phone_number'] as String,
       priority: CallPriority.values.byName(map['priority'] as String),
       dealValuePaise: map['deal_value_paise'] as int,
-      requestedAt: DateTime.parse(map['requested_at'] as String),
-      scheduledAt: DateTime.parse(map['scheduled_at'] as String),
-      createdAt: DateTime.parse(map['created_at'] as String),
+      requestedAt: _decodeIstWallClock(map['requested_at'] as String),
+      scheduledAt: _decodeIstWallClock(map['scheduled_at'] as String),
+      createdAt: _decodeIstWallClock(map['created_at'] as String),
+    );
+  }
+
+  static String _encodeIstWallClock(DateTime dateTime) {
+    return DateTime.utc(
+      dateTime.year,
+      dateTime.month,
+      dateTime.day,
+      dateTime.hour,
+      dateTime.minute,
+      dateTime.second,
+      dateTime.millisecond,
+      dateTime.microsecond,
+    ).toIso8601String().replaceFirst('Z', '');
+  }
+
+  static DateTime _decodeIstWallClock(String value) {
+    final parsed = DateTime.parse(value);
+
+    return DateTime.utc(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
     );
   }
 
@@ -45,9 +73,9 @@ class FollowUpCallModel extends FollowUpCall {
       'phone_number': phoneNumber,
       'priority': priority.name,
       'deal_value_paise': dealValuePaise,
-      'requested_at': requestedAt.toIso8601String(),
-      'scheduled_at': scheduledAt.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
+      'requested_at': _encodeIstWallClock(requestedAt),
+      'scheduled_at': _encodeIstWallClock(scheduledAt),
+      'created_at': _encodeIstWallClock(createdAt),
     };
   }
 }

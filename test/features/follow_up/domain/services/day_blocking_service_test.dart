@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:follow_up_planner/core/errors/app_exception.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
-import 'package:follow_up_planner/features/follow_up/domain/services/day_blocking_services.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/services/day_blocking_service.dart';
 
 void main() {
   // Helper function to create test calls.
@@ -27,6 +27,7 @@ void main() {
 
   group('DayBlockingService', () {
     final blockedDate = DateTime.utc(2026, 11, 3);
+    final testNow = DateTime.utc(2026, 11, 2, 9, 0);
 
     test('moves all calls from the blocked day', () {
       final existingCalls = [
@@ -45,6 +46,7 @@ void main() {
       final result = DayBlockingService.blockDay(
         date: blockedDate,
         existingCalls: existingCalls,
+        now: testNow,
       );
 
       expect(result.movedCallCount, 2);
@@ -96,6 +98,7 @@ void main() {
       final result = DayBlockingService.blockDay(
         date: blockedDate,
         existingCalls: existingCalls,
+        now: testNow,
       );
 
       final hotCall = result.updatedCalls.firstWhere(
@@ -132,6 +135,7 @@ void main() {
       final result = DayBlockingService.blockDay(
         date: blockedDate,
         existingCalls: existingCalls,
+        now: testNow,
       );
 
       final warmCalls =
@@ -156,6 +160,7 @@ void main() {
       final result = DayBlockingService.blockDay(
         date: blockedDate,
         existingCalls: existingCalls,
+        now: testNow,
       );
 
       expect(
@@ -169,6 +174,7 @@ void main() {
         () => DayBlockingService.blockDay(
           date: DateTime.utc(2026, 11, 8),
           existingCalls: [],
+          now: testNow,
         ),
         throwsA(isA<AppException>()),
       );
@@ -179,6 +185,7 @@ void main() {
         () => DayBlockingService.blockDay(
           date: DateTime.utc(2026, 12, 25),
           existingCalls: [],
+          now: testNow,
         ),
         throwsA(isA<AppException>()),
       );
@@ -188,6 +195,7 @@ void main() {
       final result = DayBlockingService.blockDay(
         date: blockedDate,
         existingCalls: [],
+        now: testNow,
       );
 
       expect(result.movedCalls, isEmpty);
@@ -205,6 +213,7 @@ void main() {
             priority: CallPriority.warm,
           ),
         ],
+        now: testNow,
       );
 
       expect(
@@ -223,6 +232,7 @@ void main() {
             priority: CallPriority.warm,
           ),
         ],
+        now: testNow,
       );
 
       expect(
@@ -252,6 +262,7 @@ void main() {
         final result = DayBlockingService.blockDay(
           date: blockedDate,
           existingCalls: existingCalls,
+          now: testNow,
         );
 
         final movedCall = result.updatedCalls.firstWhere(
@@ -304,8 +315,8 @@ void main() {
       final result = DayBlockingService.blockDay(
         date: blockedDate,
         existingCalls: existingCalls,
+        now: testNow,
       );
-      
 
       final movedCall = result.updatedCalls.firstWhere(
         (call) => call.id == 'moving',

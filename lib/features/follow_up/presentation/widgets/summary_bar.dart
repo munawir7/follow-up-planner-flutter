@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 import 'package:follow_up_planner/core/utils/indian_currency_formatter.dart';
 
 class SummaryBar extends StatelessWidget {

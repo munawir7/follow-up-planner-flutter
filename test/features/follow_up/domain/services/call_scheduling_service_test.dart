@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 import 'package:follow_up_planner/features/follow_up/domain/services/call_scheduling_service.dart';
 
@@ -29,6 +29,7 @@ void main() {
       final result = CallSchedulingService.scheduleCall(
         newCall: call,
         existingCalls: [],
+        now: DateTime.utc(2026, 11, 3, 9, 0),
       );
 
       expect(result.scheduledCall.priority, CallPriority.hot);
@@ -44,6 +45,7 @@ void main() {
       final result = CallSchedulingService.scheduleCall(
         newCall: call,
         existingCalls: [],
+        now: DateTime.utc(2026, 11, 3, 9, 0),
       );
 
       expect(result.scheduledCall.priority, CallPriority.warm);
@@ -59,6 +61,7 @@ void main() {
       final result = CallSchedulingService.scheduleCall(
         newCall: call,
         existingCalls: [],
+        now: DateTime.utc(2026, 11, 3, 9, 0),
       );
 
       expect(result.scheduledCall.priority, CallPriority.cold);

@@ -1,4 +1,4 @@
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 import '../entities/scheduling_result.dart';
 import 'hot_call_scheduler.dart';
@@ -11,6 +11,7 @@ class CallSchedulingService {
     required FollowUpCall newCall,
     required List<FollowUpCall> existingCalls,
     Set<String> blockedDateKeys = const {},
+    DateTime? now,
   }) {
     switch (newCall.priority) {
       case CallPriority.hot:
@@ -18,6 +19,7 @@ class CallSchedulingService {
           newCall: newCall,
           existingCalls: existingCalls,
           blockedDateKeys: blockedDateKeys,
+          now: now,
         );
 
       case CallPriority.warm:
@@ -26,6 +28,7 @@ class CallSchedulingService {
           newCall: newCall,
           existingCalls: existingCalls,
           blockedDateKeys: blockedDateKeys,
+          now: now,
         );
     }
   }

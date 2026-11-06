@@ -1,15 +1,9 @@
+import '../constants/app_constants.dart';
+
 class IstDateTime {
   IstDateTime._();
 
   static const Duration _istOffset = Duration(hours: 5, minutes: 30);
-
-  // Company holidays
-  static const Set<String> _companyHolidays = {
-    '2026-11-01',
-    '2026-11-09',
-    '2026-12-25',
-    '2027-01-26',
-  };
 
   // Get current IST time.
   static DateTime nowIst() {
@@ -30,6 +24,12 @@ class IstDateTime {
     return '$year-$month-$day';
   }
 
+  static bool isSameDay(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
+  }
+
   // Check Sunday.
   static bool isSunday(DateTime date) {
     return date.weekday == DateTime.sunday;
@@ -46,9 +46,9 @@ class IstDateTime {
     return weekOfMonth == 2 || weekOfMonth == 4;
   }
 
-  // Check company holidays.
+  // Check company holidays using AppConstants as the single source.
   static bool isCompanyHoliday(DateTime date) {
-    return _companyHolidays.contains(dateKey(date));
+    return AppConstants.companyHolidays.contains(dateKey(date));
   }
 
   // Check whether the date is a working day.

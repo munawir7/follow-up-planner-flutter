@@ -1,4 +1,4 @@
-import 'package:follow_up_planner/core/constants/app_constance.dart';
+import 'package:follow_up_planner/core/constants/app_constants.dart';
 
 import '../../../../core/utils/ist_date_time.dart';
 

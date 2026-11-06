@@ -1,33 +1,42 @@
-
-import 'package:follow_up_planner/core/constants/app_constance.dart';
-import 'package:follow_up_planner/domain/entities/follow_up_call.dart';
+import 'package:follow_up_planner/core/constants/app_constants.dart';
+import 'package:follow_up_planner/features/follow_up/domain/entities/follow_up_call.dart';
 
 import '../../../../core/utils/ist_date_time.dart';
+import '../../../../core/utils/phone_utils.dart';
 import 'scheduling_slot_generator.dart';
 
 class NextAvailableSlotFinder {
   NextAvailableSlotFinder._();
 
-  // Normalize phone numbers before comparison.
-  static String _normalizePhoneNumber(String phoneNumber) {
-    return phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-  }
+  // Maximum period to search for an available slot.
+  static const int maxSearchDays = 365;
 
   static DateTime? findNextAvailableSlot({
     required DateTime requestedAt,
     required String phoneNumber,
     required List<FollowUpCall> existingCalls,
     Set<String> blockedDateKeys = const {},
+    DateTime? now,
   }) {
+    final currentTime = now ?? IstDateTime.nowIst();
+
+    final searchStart = requestedAt.isAfter(currentTime)
+        ? requestedAt
+        : currentTime;
+
     var currentDate = DateTime.utc(
-      requestedAt.year,
-      requestedAt.month,
-      requestedAt.day,
+      searchStart.year,
+      searchStart.month,
+      searchStart.day,
     );
 
-    final normalizedPhone = _normalizePhoneNumber(phoneNumber);
+    // Normalize the new phone number once before searching.
+    final normalizedPhone = PhoneUtils.normalize(phoneNumber);
 
-    while (true) {
+    // Search only within the configured maximum period.
+    final searchEndDate = currentDate.add(const Duration(days: maxSearchDays));
+
+    while (!currentDate.isAfter(searchEndDate)) {
       final currentDateKey = IstDateTime.dateKey(currentDate);
 
       // Skip Sundays, non-working Saturdays, company holidays
@@ -45,10 +54,9 @@ class NextAvailableSlotFinder {
             call.scheduledAt.day == currentDate.day;
       }).toList();
 
-      // Same lead cannot have two calls on the same day.
+      // Check whether the same phone number already exists that day.
       final hasDuplicatePhone = dailyCalls.any(
-        (call) =>
-            _normalizePhoneNumber(call.phoneNumber) == normalizedPhone,
+        (call) => PhoneUtils.normalize(call.phoneNumber) == normalizedPhone,
       );
 
       if (hasDuplicatePhone) {
@@ -69,7 +77,7 @@ class NextAvailableSlotFinder {
 
       for (final slot in availableSlots) {
         // Never schedule before the requested date and time.
-        if (slot.isBefore(requestedAt)) {
+        if (slot.isBefore(searchStart)) {
           continue;
         }
 
@@ -86,5 +94,8 @@ class NextAvailableSlotFinder {
       // No available slot. Try the next working day.
       currentDate = currentDate.add(const Duration(days: 1));
     }
+
+    // No available slot found within 365 days.
+    return null;
   }
 }

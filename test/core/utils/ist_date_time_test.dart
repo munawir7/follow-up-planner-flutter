@@ -3,6 +3,13 @@ import 'package:follow_up_planner/core/utils/ist_date_time.dart';
 
 void main() {
   group('IST DateTime Tests', () {
+    test('Should identify fifth Saturday as a working day', () {
+  final date = DateTime.utc(2026, 10, 31);
+
+  expect(date.weekday, DateTime.saturday);
+  expect(IstDateTime.isSecondOrFourthSaturday(date), false);
+  expect(IstDateTime.isWorkingDay(date), true);
+});
     test('Should generate correct date key', () {
       final date = DateTime.utc(2026, 10, 30);
 
